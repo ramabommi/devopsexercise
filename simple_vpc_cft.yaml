@@ -1,0 +1,266 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Creates a VPC, a public and private subnet, and a EC2 t2 small instance with
+  two interfaces, one on each subnet.
+Parameters:
+  envPrefix:
+    Description: Environment name prefix.
+    Type: String
+    Default: Dev
+  vpcCidr:
+    Description: VPC CIDR block.
+    Type: String
+    Default: 10.4.0.0/16
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  SubnetoneCidr:
+    Description: Public subnet 1 CIDR block.
+    Type: String
+    Default: 10.4.0.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x and subnet of VPC.
+  SubnettwoCidr:
+    Description: Private subnet 1 CIDR block.
+    Type: String
+    Default: 10.4.1.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x and subnet of VPC.
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.small
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      "AMI": "ami-02354e95b39ca8dec"
+    us-east-2:
+      "AMI": "ami-07c8bc5c1ce9598c3"
+    us-west-1: 
+      "AMI": "ami-05655c267c89566dd"
+    us-west-2:
+      "AMI": "ami-0a07be880014c7b8e"
+    ca-central-1:
+      "AMI": "ami-013d1df4bcea6ba95"
+Resources:
+  vpc:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref vpcCidr
+      InstanceTenancy: default
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - !Ref envPrefix
+              - VPC
+  Subnetone:
+    Type: 'AWS::EC2::Subnet'
+    DependsOn:
+      - vpc
+      - attachGateway
+    Properties:
+      CidrBlock: !Ref SubnetoneCidr
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref vpc
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - !Ref envPrefix
+              - Subnet-one
+  Subnettwo:
+    Type: 'AWS::EC2::Subnet'
+    DependsOn:
+      - vpc
+      - attachGateway
+    Properties:
+      CidrBlock: !Ref SubnettwoCidr
+      VpcId: !Ref vpc
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - !Ref envPrefix
+              - Subnet-two
+  internetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    DependsOn:
+      - vpc
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - !Ref envPrefix
+              - InternetGateway
+  attachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    DependsOn:
+      - vpc
+      - internetGateway
+    Properties:
+      VpcId: !Ref vpc
+      InternetGatewayId: !Ref internetGateway
+  rtbone:
+    Type: 'AWS::EC2::RouteTable'
+    DependsOn:
+      - vpc
+      - attachGateway
+    Properties:
+      VpcId: !Ref vpc
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - !Ref envPrefix
+              - RTB-one
+  routeone:
+    Type: 'AWS::EC2::Route'
+    DependsOn:
+      - rtbone
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref rtbone
+      GatewayId: !Ref internetGateway
+  subnetRouteTableAssociationone:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn:
+      - rtbone
+      - Subnetone
+    Properties:
+      RouteTableId: !Ref rtbone
+      SubnetId: !Ref Subnetone
+  rtbtwo:
+    Type: 'AWS::EC2::RouteTable'
+    DependsOn:
+      - vpc
+    Properties:
+      VpcId: !Ref vpc
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - !Ref envPrefix
+              - RTB-two
+  subnetRouteTableAssociationtwo:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn:
+      - rtbtwo
+      - Subnettwo
+    Properties:
+      RouteTableId: !Ref rtbtwo
+      SubnetId: !Ref Subnettwo
+  natGatewayEIP:
+    Type: 'AWS::EC2::EIP'
+    DependsOn:
+      - vpc
+      - attachGateway
+    Properties:
+      Domain: vpc
+  natGateway:
+    DependsOn:
+      - vpc
+      - attachGateway
+    Type: 'AWS::EC2::NatGateway'
+    Properties:
+      AllocationId: !GetAtt 
+        - natGatewayEIP
+        - AllocationId
+      SubnetId: !Ref Subnetone
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - !Ref envPrefix
+              - NATGateway
+  routetwo:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref rtbtwo
+      NatGatewayId: !Ref natGateway
+  InstanceSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId: !Ref vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  ENItwo:
+    DependsOn:
+      - ec2Instance
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      Description: subnettwo
+      SourceDestCheck: 'false'
+      GroupSet:
+        - !Ref InstanceSG
+      SubnetId: !Ref Subnettwo
+  NetworkInterfaceAttachment:
+    DependsOn:
+      - ec2Instance
+      - ENItwo
+    Type: AWS::EC2::NetworkInterfaceAttachment
+    Properties:
+      InstanceId:
+        Ref: ec2Instance
+      NetworkInterfaceId:
+        Ref: ENItwo
+      DeviceIndex: 1
+  ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref InstanceSG
+      SubnetId: !Ref Subnetone
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - !Ref envPrefix
+              - ec2Instance
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref vpc
+    Export:
+      Name: !Join 
+        - '-'
+        - - !Ref envPrefix
+          - VPC
+  Subnetone:
+    Description: A reference to the created public subnet
+    Value: !Ref Subnetone
+    Export:
+      Name: !Join 
+        - '-'
+        - - !Ref envPrefix
+          - Subnet-one
+  Subnettwo:
+    Description: A reference to the created private subnet
+    Value: !Ref Subnettwo
+    Export:
+      Name: !Join 
+        - '-'
+        - - !Ref envPrefix
+          - Subnet-two
+  InstanceID:
+    Description: A reference to the created ec2 instance
+    Value: !Ref ec2Instance
+    Export:
+      Name: !Join 
+        - '-'
+        - - !Ref envPrefix
+          - ec2Instance

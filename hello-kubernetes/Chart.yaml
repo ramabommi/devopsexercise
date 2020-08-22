@@ -1,0 +1,7 @@
+apiVersion: v1
+name: hello-kubernetes
+version: 0.0.1
+description: Helm chart for hello-kubernetes
+maintainers:
+  - name: ramakrishna.bommineni
+    email: ramabommi20@gmail.com

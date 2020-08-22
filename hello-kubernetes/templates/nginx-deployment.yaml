@@ -1,0 +1,27 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.nginxdeployment.name }}
+spec:
+  replicas: {{ .Values.nginxdeployment.replicas }}
+  selector:
+    matchLabels: {{ toYaml .Values.nginxdeployment.labels | trim | nindent 6 }}
+  template:
+    metadata:
+      labels: {{ toYaml .Values.nginxdeployment.labels | trim | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Values.nginxdeployment.containername }}
+        image: {{ .Values.nginxdeployment.image.repository }}:{{ .Values.nginxdeployment.image.tag }}
+        imagePullPolicy: {{ .Values.nginxdeployment.image.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.nginxdeployment.containerPort }}
+        volumeMounts:
+          - name: default-config
+            mountPath: /etc/nginx/conf.d/default.conf
+            subPath: default.conf
+      volumes:
+        - name: default-config
+          configMap:
+            name: {{ .Values.configmap.name }}

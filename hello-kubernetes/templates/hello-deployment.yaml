@@ -1,0 +1,19 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.hellodeployment.name }}
+spec:
+  replicas: {{ .Values.hellodeployment.replicas }}
+  selector:
+    matchLabels: {{ toYaml .Values.hellodeployment.labels | trim | nindent 6 }}
+  template:
+    metadata:
+      labels: {{ toYaml .Values.hellodeployment.labels | trim | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Values.hellodeployment.containername }}
+        image: {{ .Values.hellodeployment.image.repository }}:{{ .Values.hellodeployment.image.tag }}
+        imagePullPolicy: {{ .Values.hellodeployment.image.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.hellodeployment.containerPort }}

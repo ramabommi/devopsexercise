@@ -1,0 +1,57 @@
+hellodeployment:
+  name: helloworlddeployment
+  labels:
+    app: hello-kubernetes
+  replicas: 3
+  containername: hello-container
+  containerPort: 8080
+  image:
+    repository: paulbouwer/hello-kubernetes
+    tag: 1.8
+    imagePullPolicy: Always
+
+helloservice:
+  name: helloworldservice
+  labels:
+    app: nginx
+  port: 80
+
+nginxdeployment:
+  name: nginxdeployment
+  labels:
+    app: nginx
+  replicas: 1
+  containername: nginx-container
+  containerPort: 80
+  image:
+    repository: nginx
+    tag: latest
+    imagePullPolicy: Always
+
+nginxservice:
+  name: nginxproxy
+  labels:
+    app: nginx
+  port: 80
+  nodeport: 31000
+
+configmap:
+  name: nginxconfig
+  labels:
+    app: nginx
+  data: 
+    default.conf: |
+      upstream hello {
+        server helloworldservice:80;
+      }
+      server {
+        listen 80;
+        server_name  nginxdeployment;
+        location / {
+        proxy_pass http://hello;
+        proxy_connect_timeout 2600s;
+        proxy_send_timeout 2600s;
+        proxy_read_timeout 2600s;
+        send_timeout 2600s;
+        }
+      }

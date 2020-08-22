@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.nginxservice.name }}
+  labels: {{ toYaml .Values.nginxservice.labels | trim | nindent 4 }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.nginxservice.port }}
+    targetPort: {{ .Values.nginxdeployment.containerPort }}
+    nodePort: {{ .Values.nginxservice.nodeport }}
+    protocol: TCP
+  selector: {{ toYaml .Values.nginxdeployment.labels | trim | nindent 4 }}
